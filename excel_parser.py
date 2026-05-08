@@ -1,11 +1,23 @@
 import openpyxl
 
+def _safe_float(val):
+    if val is None:
+        return 0.0
+    s = str(val).strip()
+    if s == "":
+        return 0.0
+    s = s.replace("€", "").replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except:
+        return 0.0
+
 def parse_excel(file):
     """
     Ritorna: dict[impegnativa] = {"tariffa": float, "ticket": float}
     Colonna A = impegnativa
     Colonna C = tariffa
-    Colonna H = importo ticket
+    Colonna H = ticket
     """
     wb = openpyxl.load_workbook(file, data_only=True)
     ws = wb.active
@@ -13,20 +25,20 @@ def parse_excel(file):
     results = {}
 
     for row in ws.iter_rows(min_row=2, values_only=True):
-        if row[0] is None:
+        imp = row[0]
+        if imp is None:
             continue
 
-        imp = str(row[0]).strip()
+        imp = str(imp).strip()
         if imp == "":
             continue
 
-        tariffa = float(row[2]) if row[2] is not None else 0.0
-        ticket = float(row[7]) if len(row) > 7 and row[7] is not None else 0.0
+        tariffa = _safe_float(row[2]) if len(row) > 2 else 0.0
+        ticket = _safe_float(row[7]) if len(row) > 7 else 0.0
 
         if imp not in results:
             results[imp] = {"tariffa": 0.0, "ticket": 0.0}
 
-        # Se la stessa impegnativa è su più righe, sommiamo
         results[imp]["tariffa"] += tariffa
         results[imp]["ticket"] += ticket
 
