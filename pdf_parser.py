@@ -1,13 +1,42 @@
 import pdfplumber
+import re
+
+def _clean(s):
+    if s is None:
+        return ""
+    return str(s).strip().lower().replace(" ", "").replace("º", "°")
 
 def _to_float(val):
     if val is None:
         return 0.0
-    s = str(val).replace("€", "").replace(".", "").replace(",", ".").strip()
+
+    s = str(val).strip()
+
+    # Rimuovi euro e spazi strani
+    s = s.replace("€", "").replace("\u00A0", "").strip()
+
+    # Caso 1: numeri spezzati tipo "60 15"
+    if re.match(r"^\d+\s+\d+$", s):
+        parts = s.split()
+        s = parts[0] + "," + parts[1]
+
+    # Caso 2: numeri spezzati con punti o simboli strani
+    if re.match(r"^\d+[^\d]\d+$", s):
+        s = re.sub(r"[^\d]", ",", s)
+
+    # Caso 3: numeri senza virgola ma troppo lunghi (es. 21605)
+    if re.match(r"^\d{3,}$", s) and "," not in s and "." not in s:
+        # euristica: ultimi due numeri sono i decimali
+        s = s[:-2] + "," + s[-2:]
+
+    # Normalizza
+    s = s.replace(".", "").replace(",", ".")
+
     try:
         return float(s)
     except:
         return 0.0
+
 
 def parse_pdf(file):
     results = {}
@@ -20,26 +49,32 @@ def parse_pdf(file):
                 if not table or len(table) < 2:
                     continue
 
-                header = [str(h).strip().lower() for h in table[0]]
+                header = [_clean(h) for h in table[0]]
 
-                # Trova indici dinamicamente
-                try:
-                    idx_imp = header.index("nº impegnativa")
-                except:
-                    try:
-                        idx_imp = header.index("n° impegnativa")
-                    except:
-                        continue
-
-                try:
-                    idx_tariffa = header.index("tariffa")
-                except:
+                # Trova indice impegnativa
+                idx_imp = None
+                for i, h in enumerate(header):
+                    if "impegnativa" in h:
+                        idx_imp = i
+                        break
+                if idx_imp is None:
                     continue
 
-                try:
-                    idx_ticket = header.index("imp. ticket")
-                except:
-                    idx_ticket = None
+                # Trova indice tariffa
+                idx_tariffa = None
+                for i, h in enumerate(header):
+                    if "tariffa" in h:
+                        idx_tariffa = i
+                        break
+                if idx_tariffa is None:
+                    continue
+
+                # Trova indice ticket
+                idx_ticket = None
+                for i, h in enumerate(header):
+                    if "ticket" in h:
+                        idx_ticket = i
+                        break
 
                 # Leggi righe
                 for row in table[1:]:
