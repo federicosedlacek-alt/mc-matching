@@ -6,13 +6,20 @@ def _clean(s):
         return ""
     return str(s).strip().lower().replace(" ", "").replace("º", "°")
 
+import re
+
 def _to_float(val):
     if val is None:
         return 0.0
 
+    # Caso 0: pdfplumber estrae liste di pezzi → ricomponi
+    if isinstance(val, list):
+        # unisci tutto con spazio
+        val = " ".join([str(v) for v in val if v])
+
     s = str(val).strip()
 
-    # Rimuovi euro e spazi strani
+    # Rimuovi euro e spazi invisibili
     s = s.replace("€", "").replace("\u00A0", "").strip()
 
     # Caso 1: numeri spezzati tipo "60 15"
@@ -20,13 +27,12 @@ def _to_float(val):
         parts = s.split()
         s = parts[0] + "," + parts[1]
 
-    # Caso 2: numeri spezzati con punti o simboli strani
+    # Caso 2: numeri spezzati con simboli strani
     if re.match(r"^\d+[^\d]\d+$", s):
         s = re.sub(r"[^\d]", ",", s)
 
     # Caso 3: numeri senza virgola ma troppo lunghi (es. 21605)
     if re.match(r"^\d{3,}$", s) and "," not in s and "." not in s:
-        # euristica: ultimi due numeri sono i decimali
         s = s[:-2] + "," + s[-2:]
 
     # Normalizza
@@ -36,6 +42,7 @@ def _to_float(val):
         return float(s)
     except:
         return 0.0
+
 
 
 def parse_pdf(file):
