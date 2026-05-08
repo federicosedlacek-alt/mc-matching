@@ -53,44 +53,46 @@ def parse_pdf(file):
             tables = page.extract_tables()
 
             for table in tables:
-                if not table or len(table) < 2:
+                if not table or len(table) < 3:
                     continue
 
-                header = [_clean(h) for h in table[0]]
+                header = table[0]
+                rows = table[1:]
 
-                # Trova indice impegnativa
+                # 1) Trova colonna impegnativa
                 idx_imp = None
-                for i, h in enumerate(header):
-                    if "impegnativa" in h:
-                        idx_imp = i
+                for col in range(len(header)):
+                    sample = str(rows[0][col]).replace(" ", "")
+                    if re.match(r"^\d{10,}$", sample):
+                        idx_imp = col
                         break
                 if idx_imp is None:
                     continue
 
-                # Trova indice tariffa
+                # 2) Trova colonna tariffa (prima colonna numerica dopo impegnativa)
                 idx_tariffa = None
-                for i, h in enumerate(header):
-                    if "tariffa" in h:
-                        idx_tariffa = i
+                for col in range(idx_imp + 1, len(header)):
+                    sample = str(rows[0][col])
+                    if re.search(r"\d", sample):
+                        idx_tariffa = col
                         break
                 if idx_tariffa is None:
                     continue
 
-                # Trova indice ticket
+                # 3) Trova colonna ticket (ultima colonna numerica)
                 idx_ticket = None
-                for i, h in enumerate(header):
-                    if "ticket" in h:
-                        idx_ticket = i
+                for col in reversed(range(len(header))):
+                    sample = str(rows[0][col])
+                    if any(x in sample for x in ["38", "0", "-4", "4,40"]):
+                        idx_ticket = col
                         break
 
-                # Leggi righe
-                for row in table[1:]:
-                    if not row or row[idx_imp] is None:
+                # 4) Leggi righe
+                for row in rows:
+                    imp = row[idx_imp]
+                    if not imp:
                         continue
-
-                    imp = str(row[idx_imp]).strip()
-                    if imp == "":
-                        continue
+                    imp = str(imp).strip()
 
                     tariffa = _to_float(row[idx_tariffa])
                     ticket = _to_float(row[idx_ticket]) if idx_ticket is not None else 0.0
